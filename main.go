@@ -6,20 +6,15 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"astuart.co/goq"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/n0ncetonic/crt_sheep/pkg/logger"
 )
 
-// Structured representation for github file name table
-type example struct {
-	ID    string   `goquery:"table:nth-child(8) > tbody > tr > td > table > tbody > tr:nth-child(2) > td > a"`
-	Files []string `goquery:"table.files tbody tr.js-navigation-item td.content,text"`
-}
+var opts = make(map[string]string)
 
-func initFlags() (opts map[string]string) {
-	o := make(map[string]string)
-
-	queryFlag := flag.StringP("query", "q", "", "desired search query [required]")
+func init() {
+	var debug = flag.BoolP("debug", "d", false, "enable debug output")
+	var queryFlag = flag.StringP("query", "q", "", "desired search query [required]")
 
 	flag.Parse()
 
@@ -28,36 +23,52 @@ func initFlags() (opts map[string]string) {
 		os.Exit(1)
 	}
 
-	o["query"] = *queryFlag
-	return opts
-}
-
-func init() {
-	var debug = flag.BoolP("debug", "d", false, "enable debug output")
+	opts["query"] = *queryFlag
 
 	if !*debug {
 		logger.HideDebug()
 	}
+
 }
 
-func main() {
-	// options := initFlags()
-	_ = initFlags()
+func getIDs(s string) (ids []string) {
+	req, err := http.NewRequest("GET", "https://crt.sh/atom/", nil)
+	if err != nil {
+		logger.Debug(err)
+	}
 
-	res, err := http.Get("https://crt.sh/atom/?q=Dropbox.com.")
+	q := req.URL.Query()
+	q.Add("q", s)
+	req.URL.RawQuery = q.Encode()
+
+	res, err := http.Get(req.URL.String())
 	if err != nil {
 		logger.Info(err)
 		os.Exit(1)
 	}
 	defer res.Body.Close()
-
-	var ex example
-
-	err = goq.NewDecoder(res.Body).Decode(&ex)
-	if err != nil {
-		logger.Info(err)
-		os.Exit(1)
+	if res.StatusCode != 200 {
+		logger.Debug("status code error: ", res.StatusCode, res.Status)
 	}
 
-	logger.Info(ex.ID)
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		logger.Debug(err)
+	}
+
+	// body > table:nth-child(8) > tbody > tr > td > table > tbody > tr:nth-child(2) > td:nth-child(1)
+	doc.Find("td.outer table tbody tr td:nth-child(1)").Each(func(i int, s *goquery.Selection) {
+		logger.Debug(i)
+		result := s.Find("a").Text()
+		ids = append(ids, result)
+		logger.Debug(result)
+	})
+	return ids
+}
+
+func main() {
+	query := opts["query"]
+	ids := getIDs(query)
+	logger.Info(ids)
+
 }
