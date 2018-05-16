@@ -48,6 +48,7 @@ func unique(stringSlice []string) []string {
 
 func grabSAN(ids []string) (sans []string) {
 	for _, id := range ids {
+		logger.Debug("parsing ID ", id, "..")
 		req, err := http.NewRequest("GET", "https://crt.sh/", nil)
 		if err != nil {
 			logger.Debug(err)
@@ -77,7 +78,6 @@ func grabSAN(ids []string) (sans []string) {
 		r, _ := regexp.Compile(`;DNS:([a-z\.]+)<BR>`)
 		matches := r.FindAllStringSubmatch(src, -1)
 		for _, match := range matches {
-			logger.Debug(match[1])
 			sans = append(sans, match[1])
 		}
 
@@ -87,6 +87,7 @@ func grabSAN(ids []string) (sans []string) {
 }
 
 func getIDs(s string) (ids []string) {
+	logger.Debug("grabbing IDs for ", s, "..")
 	req, err := http.NewRequest("GET", "https://crt.sh/atom/", nil)
 	if err != nil {
 		logger.Debug(err)
