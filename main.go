@@ -1,8 +1,10 @@
 package main
 
 import (
+	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 
 	flag "github.com/spf13/pflag"
 
@@ -31,6 +33,59 @@ func init() {
 
 }
 
+// From http://www.golangprograms.com/remove-duplicate-values-from-slice.html
+func unique(stringSlice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range stringSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
+func grabSAN(ids []string) (sans []string) {
+	for _, id := range ids {
+		req, err := http.NewRequest("GET", "https://crt.sh/", nil)
+		if err != nil {
+			logger.Debug(err)
+		}
+		q := req.URL.Query()
+		q.Add("id", id)
+		q.Add("output", "json")
+		req.URL.RawQuery = q.Encode()
+
+		res, err := http.Get(req.URL.String())
+		if err != nil {
+			logger.Debug(err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			logger.Debug("status code error: ", res.StatusCode, res.Status)
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			logger.Debug(err)
+			return
+		}
+
+		src := string(body)
+
+		r, _ := regexp.Compile(`;DNS:([a-z\.]+)<BR>`)
+		matches := r.FindAllStringSubmatch(src, -1)
+		for _, match := range matches {
+			logger.Debug(match[1])
+			sans = append(sans, match[1])
+		}
+
+	}
+
+	return unique(sans)
+}
+
 func getIDs(s string) (ids []string) {
 	req, err := http.NewRequest("GET", "https://crt.sh/atom/", nil)
 	if err != nil {
@@ -56,12 +111,9 @@ func getIDs(s string) (ids []string) {
 		logger.Debug(err)
 	}
 
-	// body > table:nth-child(8) > tbody > tr > td > table > tbody > tr:nth-child(2) > td:nth-child(1)
 	doc.Find("td.outer table tbody tr td:nth-child(1)").Each(func(i int, s *goquery.Selection) {
-		logger.Debug(i)
 		result := s.Find("a").Text()
 		ids = append(ids, result)
-		logger.Debug(result)
 	})
 	return ids
 }
@@ -69,6 +121,7 @@ func getIDs(s string) (ids []string) {
 func main() {
 	query := opts["query"]
 	ids := getIDs(query)
-	logger.Info(ids)
+	san := grabSAN(ids)
+	logger.Info(san)
 
 }
