@@ -1,5 +1,9 @@
 # crt_sheep
 
+# UPDATE AUG 6, 2018
+All is good with crt.sh again. If you have any issues in the future refer to the Aug 4 update and ensure the domain isn't currently down
+
+
 # UPDATE AUG 4, 2018
 I was wondering why my tool was erroring out so I checked out the https://crt.sh website and realized it was 404'ing with the following showing up when cURL'd . Until further notice this tool is sadly broken as it depends on crt.sh
 
